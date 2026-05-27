@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>点点 · 你的小红书专属陪伴 Agent</title>
+<meta name="description" content="深度融合小红书生态的陪伴式专属 Agent · 单文件 Demo" />
+
+<!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          xhs: {
+            red: "#FF2442",
+            redDark: "#E51F3C",
+            redSoft: "#FF6B8A",
+            redLight: "#FFE8EC",
+            redMist: "#FFF5F6",
+            bg: "#F7F7F8",
+            ink: "#1F1F22",
+            sub: "#8A8A8E",
+            mute: "#B5B5BA",
+            line: "#EFEFF1",
+          },
+        },
+        boxShadow: {
+          card: "0 1px 2px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.04)",
+          glow: "0 0 0 1px rgba(255,36,66,0.15), 0 8px 28px rgba(255,36,66,0.16)",
+          lift: "0 12px 36px rgba(0,0,0,0.08)",
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  html, body {
+    background: #F7F7F8;
+    color: #1F1F22;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+      system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+  }
+  * { box-sizing: border-box; }
+
+  .light-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .light-scroll::-webkit-scrollbar-track { background: transparent; }
+  .light-scroll::-webkit-scrollbar-thumb { background: #E0E0E3; border-radius: 4px; }
+  .light-scroll::-webkit-scrollbar-thumb:hover { background: #C8C8CC; }
+
+  .xhs-grad { background: linear-gradient(135deg, #FF2442 0%, #FF6B8A 100%); }
+  .xhs-grad-soft { background: linear-gradient(135deg, #FFF5F6 0%, #FFE8EC 100%); }
+
+  /* 主背景：极淡的双色径向光 */
+  .light-bg {
+    background:
+      radial-gradient(1200px 600px at 0% 0%, rgba(255,36,66,0.045), transparent 60%),
+      radial-gradient(1000px 500px at 100% 100%, rgba(255,107,138,0.04), transparent 60%),
+      #F7F7F8;
+  }
+
+  .tag-enter { animation: tagEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  @keyframes tagEnter {
+    0% { opacity: 0; transform: scale(0.5) translateY(-6px); }
+    60% { transform: scale(1.08); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  .typing-dot {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: #FF2442;
+    margin: 0 2px; animation: typingPulse 1.2s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes typingPulse {
+    0%, 60%, 100% { transform: scale(0.6); opacity: 0.4; }
+    30% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .exp-bar-shine {
+    background-image: linear-gradient(90deg, #FF2442 0%, #FF6B8A 50%, #FF2442 100%);
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+  }
+
+  .anim-fade-in { animation: fadeIn 0.4s ease-out; }
+  .anim-slide-up { animation: slideUp 0.4s ease-out; }
+  @keyframes fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes slideUp {
+    0% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ===== 首屏引导（红粉版） ===== */
+  .splash-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: linear-gradient(135deg, #FF2442 0%, #FF6B8A 60%, #FFA6B8 100%);
+    display: flex; align-items: center; justify-content: center;
+    animation: splashFadeOut 0.7s ease-in 2.4s forwards;
+    overflow: hidden;
+  }
+  .splash-overlay::before, .splash-overlay::after {
+    content: ""; position: absolute; border-radius: 50%;
+    background: rgba(255,255,255,0.18); filter: blur(48px);
+  }
+  .splash-overlay::before {
+    width: 360px; height: 360px; top: -100px; left: -100px;
+    animation: floatBubble 6s ease-in-out infinite;
+  }
+  .splash-overlay::after {
+    width: 300px; height: 300px; bottom: -80px; right: -80px;
+    animation: floatBubble 7s ease-in-out infinite reverse;
+  }
+  .splash-card {
+    position: relative; text-align: center; color: #fff;
+    animation: splashPop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .splash-avatar {
+    width: 88px; height: 88px; margin: 0 auto 22px;
+    border-radius: 26px; background: rgba(255,255,255,0.26);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+    animation: avatarBob 2.4s ease-in-out infinite;
+  }
+  .splash-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px; }
+  .splash-sub { font-size: 13px; opacity: 0.92; letter-spacing: 0.5px; }
+  .splash-dots { margin-top: 22px; display: flex; gap: 6px; justify-content: center; }
+  .splash-dots span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #fff; animation: typingPulse 1.2s infinite ease-in-out;
+  }
+  .splash-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .splash-dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes splashFadeOut { to { opacity: 0; visibility: hidden; transform: scale(1.05); } }
+  @keyframes splashPop {
+    0% { opacity: 0; transform: scale(0.8) translateY(20px); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes avatarBob {
+    0%,100% { transform: translateY(0) rotate(-3deg); }
+    50% { transform: translateY(-6px) rotate(3deg); }
+  }
+  @keyframes floatBubble {
+    0%,100% { transform: translate(0,0) scale(1); }
+    50% { transform: translate(20px,-20px) scale(1.1); }
+  }
+
+  /* 移动端 */
+  @media (max-width: 1023px) {
+    .chat-shell { height: auto !important; min-height: 540px !important; }
+    .chat-stream { max-height: 60vh; }
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .bubble-actions { opacity: 0; transition: opacity 0.2s; }
+  .ai-bubble:hover .bubble-actions { opacity: 1; }
+
+  .suggest-link { position: relative; }
+  .suggest-link::after {
+    content: ""; position: absolute; left: 0; bottom: -2px;
+    height: 1px; width: 0; background: #FF2442;
+    transition: width 0.3s;
+  }
+  .suggest-link:hover::after { width: 100%; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- React 18 + Babel Standalone -->
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+/* ===== 内联 SVG 图标 ===== */
+const ICON_PATHS = {
+  send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  chevronRight: '<path d="m9 18 6-6-6-6"/>',
+  arrowUpRight: '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  bookOpen: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  rotateCcw: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  menu: '<path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  share: '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  mic: '<rect width="6" height="12" x="9" y="2" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+};
+function Icon({ name, className = "w-4 h-4", strokeWidth = 2 }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth={strokeWidth}
+      strokeLinecap="round" strokeLinejoin="round" className={className}
+      dangerouslySetInnerHTML={{ __html: ICON_PATHS[name] }}
+    />
+  );
+}
+
+/* ===== Mock 数据 ===== */
+const INITIAL_FOOTPRINT_TAGS = [
+  { id: "t1", label: "大厂实习面经", hot: true },
+  { id: "t2", label: "天津周末探店" },
+  { id: "t3", label: "CS考研408" },
+  { id: "t4", label: "IROS论文投稿" },
+  { id: "t5", label: "JVM调优" },
+  { id: "t6", label: "Citywalk路线" },
+];
+
+const PERSONA_TAGS = [
+  { label: "Java 后端开发选手", emoji: "☕" },
+  { label: "学术科研党", emoji: "📚" },
+  { label: "算法爱好者", emoji: "🧮" },
+  { label: "天津本地通", emoji: "🥟" },
+  { label: "深度阅读者", emoji: "📖" },
+  { label: "效率工具控", emoji: "⚡" },
+];
+
+const COLLECTED_NOTES = [
+  { id: 1, title: "RocketMQ 高并发实战笔记｜十连问总结", author: "后端老司机", likes: "3.2w", height: 180, coverGradient: "from-orange-200 via-red-200 to-pink-200", coverEmoji: "📨", tag: "后端" },
+  { id: 2, title: "IROS 顶会单栏排版防坑指南", author: "论文卷王Lily", likes: "8632", height: 220, coverGradient: "from-blue-200 via-indigo-200 to-purple-200", coverEmoji: "📄", tag: "学术" },
+  { id: 3, title: "ACM 竞赛刷题攻略｜从绿名到紫名", author: "算法萌新", likes: "1.6w", height: 160, coverGradient: "from-green-200 via-teal-200 to-cyan-200", coverEmoji: "🏆", tag: "算法" },
+  { id: 4, title: "天津五大道 Citywalk 完整地图", author: "探店本店", likes: "2.4w", height: 200, coverGradient: "from-yellow-200 via-orange-200 to-red-200", coverEmoji: "🌆", tag: "探店" },
+  { id: 5, title: "Spring Boot 3 + JDK21 升级踩坑实录", author: "Java小能手", likes: "9821", height: 170, coverGradient: "from-rose-200 via-pink-200 to-fuchsia-200", coverEmoji: "🌱", tag: "后端" },
+  { id: 6, title: "考研复试英语口语万能模板", author: "上岸学姐", likes: "5.7w", height: 190, coverGradient: "from-sky-200 via-blue-200 to-indigo-200", coverEmoji: "🎓", tag: "考研" },
+];
+
+/* 可导入笔记池：点击「从主站收藏夹导入更多」时按顺序补充进来 */
+const IMPORTABLE_NOTES = [
+  { id: 7, title: "Redis 7 新特性盘点｜面试现学现卖", author: "缓存攻城狮", likes: "1.2w", height: 175, coverGradient: "from-red-200 via-rose-200 to-orange-200", coverEmoji: "🔴", tag: "后端" },
+  { id: 8, title: "海河边夜跑 5km 路线｜避开人潮版", author: "津门跑者", likes: "4521", height: 165, coverGradient: "from-cyan-200 via-blue-200 to-sky-200", coverEmoji: "🌊", tag: "运动" },
+  { id: 9, title: "Vim 30 天速成｜配置文件打包带走", author: "效率狂人", likes: "2.8w", height: 180, coverGradient: "from-emerald-200 via-green-200 to-lime-200", coverEmoji: "⌨️", tag: "工具" },
+  { id: 10, title: "GitHub 简历开源项目挑选攻略", author: "求职导师", likes: "1.9w", height: 195, coverGradient: "from-purple-200 via-violet-200 to-indigo-200", coverEmoji: "🐙", tag: "求职" },
+];
+
+const DEFAULT_SUGGESTS = [
+  "我要准备后端面试了",
+  "帮我整理一下收藏夹",
+  "天津周末有什么新开的店",
+  "整理一份算法刷题计划",
+];
+
+const KEYWORD_TO_TAG = [
+  { keys: ["后端", "面试", "实习"], tag: "大厂后端面经2026" },
+  { keys: ["考研", "复习", "408"], tag: "408冲刺120分" },
+  { keys: ["探店", "周末", "天津"], tag: "天津宝藏小店挖掘" },
+  { keys: ["算法", "刷题", "leetcode", "LeetCode"], tag: "LeetCode每日一题" },
+  { keys: ["论文", "顶会", "投稿", "iros", "IROS"], tag: "顶会投稿避坑" },
+  { keys: ["citywalk", "路线", "压马路"], tag: "天津Citywalk攻略" },
+];
+
+const KEYWORD_TO_NOTES = [
+  { keys: ["后端", "面试", "实习", "Java", "java", "jvm", "JVM", "调优", "Spring", "RocketMQ"], noteIds: [1, 5, 3] },
+  { keys: ["考研", "复习"], noteIds: [6, 3] },
+  { keys: ["论文", "顶会", "投稿", "排版"], noteIds: [2] },
+  { keys: ["算法", "刷题", "leetcode", "LeetCode", "ACM"], noteIds: [3, 5] },
+  { keys: ["探店", "周末", "天津", "citywalk", "Citywalk"], noteIds: [4] },
+  { keys: ["收藏夹", "总结", "整理"], noteIds: [2, 1, 4] },
+];
+
+const KEYWORD_TO_SUGGESTS = [
+  { keys: ["后端", "面试", "实习", "java", "jvm", "JVM", "调优"], suggests: ["7天后端冲刺计划怎么排", "RocketMQ 面试高频考点", "项目经历怎么写更打动面试官"] },
+  { keys: ["考研", "408", "复试"], suggests: ["复试英语口语模板", "408 操作系统刷题策略", "导师该怎么选"] },
+  { keys: ["论文", "顶会", "投稿"], suggests: ["投稿前 24 小时 Checklist", "IEEE 模板常见报错", "Rebuttal 写作技巧"] },
+  { keys: ["探店", "周末", "天津", "citywalk"], suggests: ["半日 Citywalk + 晚餐路线", "天津本地人才知道的小馆子", "海河夜景最佳机位"] },
+  { keys: ["算法", "刷题", "leetcode"], suggests: ["30天上岸算法计划", "LeetCode Hot100 顺序", "图论高频套路"] },
+  { keys: ["收藏夹", "总结", "整理"], suggests: ["按主题给我做一份导览", "把过期的笔记清掉", "找一篇我半年前收藏的论文"] },
+];
+
+function generateAIReply(userInput) {
+  if (/后端|面试|实习|java|jvm|调优|spring|rocketmq/i.test(userInput)) {
+    return { text:
+"充时，看到你最近在搜「大厂实习面经」～我从你收藏夹里翻到了几篇压箱底的好货：\n\n• RocketMQ 是大厂后端面试的高频考点，先把那篇实战笔记吃透\n• Spring Boot 3 + JDK21 升级踩坑，能让你在「项目经历」环节眼前一亮\n• ACM 攻略里的 DP 与图论部分，是手撕代码环节的硬通货\n\n要不要我帮你拉一份「7天后端冲刺计划」？", cite: true };
+  }
+  if (/考研|408|复试/i.test(userInput)) {
+    return { text:
+"考研冲刺期啦！结合你的「学术科研党」画像，我建议：\n\n• 408 知识点中操作系统和计组容易丢分，每天专项刷题2小时\n• 复试英语口语提前准备「为什么选这个方向」的故事线\n• 把收藏夹里的论文范式提前过一遍，复试面谈会用到\n\n需要我每天早上 7:30 给你推一道高频题吗？", cite: true };
+  }
+  if (/论文|顶会|投稿|排版/i.test(userInput)) {
+    return { text:
+"懂了，又是一个 Deadline 战士。\n\n根据你收藏的《IROS 顶会单栏排版防坑指南》，重点踩坑点：\n• figure 跨栏一定用 figure*，不要硬塞\n• 参考文献用 IEEEtran，不要用默认 plain\n• 提交前一定 overleaf 编译一次 final 模式\n\n要我给你拉一个「投稿前 24 小时 Checklist」吗？", cite: true };
+  }
+  if (/探店|周末|天津|citywalk|压马路/i.test(userInput)) {
+    return { text:
+"周末终于不卷啦～根据你「天津本地通」画像 + 最近搜过五大道：\n\n• 五大道-民园广场-意风区，一条线压完不重样\n• 推荐顺路打卡：耳朵眼炸糕（本地人才知道的总店）\n• 傍晚去海河边坐一坐，比白天人少氛围更好\n\n要不要我帮你排一个「半日 Citywalk + 晚餐」的时间线？", cite: true };
+  }
+  if (/算法|刷题|leetcode|acm/i.test(userInput)) {
+    return { text:
+"看到你的「算法爱好者」标签亮了。\n\n根据你的进度，下一阶段建议：\n• 先把 ACM 攻略里的「图论 + DP」专题吃透\n• 每天 2 道 Hot100，保持手感\n• 周末模拟一次 LeetCode 周赛，找做题节奏\n\n要我帮你生成一份「30天上岸算法计划」吗？", cite: true };
+  }
+  if (/总结|整理|收藏夹/i.test(userInput)) {
+    return { text:
+"充时，让我帮你梳理一下收藏夹：\n\n• 学术向：IROS 排版指南（投稿必看）\n• 求职向：RocketMQ 实战 + Spring Boot 升级\n• 生活向：天津 Citywalk 路线\n\n你最近的关注重心明显偏「学术 + 求职」，我帮你按主题分类整理一份导览，要吗？", cite: true };
+  }
+  return { text:
+"让我想想…我帮你结合你最近在主站的搜索记录和数字分身画像分析一下～你可以试试问我：", cite: false };
+}
+
+function matchKeyword(input, dict) {
+  for (const item of dict) if (item.keys.some((k) => input.includes(k))) return item;
+  return null;
+}
+
+const STORAGE_KEY = "diandian_ai_state_v4_interactive";
+
+function Page() {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [tags, setTags] = useState(INITIAL_FOOTPRINT_TAGS);
+  const [notes, setNotes] = useState(COLLECTED_NOTES);
+  const [importCursor, setImportCursor] = useState(0);
+  const [exp, setExp] = useState(62);
+  const [level, setLevel] = useState(3);
+  const [isTyping, setIsTyping] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const seen = localStorage.getItem("diandian_splash_seen_v4");
+    if (seen) { setShowSplash(false); return; }
+    const t = setTimeout(() => {
+      setShowSplash(false);
+      try { localStorage.setItem("diandian_splash_seen_v4", "1"); } catch(e){}
+    }, 3100);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.messages) setMessages(data.messages);
+        if (data.tags) setTags(data.tags);
+        if (data.notes) setNotes(data.notes);
+        if (typeof data.importCursor === "number") setImportCursor(data.importCursor);
+        if (typeof data.exp === "number") setExp(data.exp);
+        if (typeof data.level === "number") setLevel(data.level);
+      } else {
+        setMessages([{
+          id: Date.now(), role: "ai",
+          text: "充时，下午好呀～\n我注意到你今天又在主站搜了「大厂实习面经」，要不要我把你收藏夹里的几篇硬核笔记串成一份冲刺计划？",
+          cite: true, citedNotes: [1, 3, 5],
+          suggests: ["7天后端冲刺计划怎么排", "RocketMQ 面试高频考点", "项目经历怎么写更打动面试官"],
+        }]);
+      }
+    } catch(e){}
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({messages,tags,notes,importCursor,exp,level})); } catch(e){}
+  }, [messages, tags, notes, importCursor, exp, level, hydrated]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
+
+  /* 工具：直接合成一条 AI 消息（不走 generateAIReply） */
+  const pushAIMessage = (payload) => {
+    setMessages((prev) => [...prev, {
+      id: Date.now() + Math.random(),
+      role: "ai",
+      text: payload.text,
+      cite: !!payload.cite,
+      citedNotes: payload.citedNotes || [],
+      suggests: payload.suggests || [],
+    }]);
+  };
+
+  const addExp = (n) => {
+    setExp((e) => {
+      const next = e + n;
+      if (next >= 100) { setLevel((lv) => lv + 1); return next - 100; }
+      return next;
+    });
+  };
+
+  const handleSend = (textOverride) => {
+    const text = (textOverride ?? input).trim();
+    if (!text) return;
+    setMessages((prev) => [...prev, { id: Date.now(), role: "user", text }]);
+    setInput("");
+
+    const tagMatch = matchKeyword(text, KEYWORD_TO_TAG);
+    if (tagMatch && !tags.find((t) => t.label === tagMatch.tag)) {
+      setTimeout(() => {
+        setTags((prev) => [{ id: "t" + Date.now(), label: tagMatch.tag, hot: true, fresh: true }, ...prev]);
+      }, 600);
+    }
+
+    addExp(7);
+
+    setIsTyping(true);
+    setTimeout(() => {
+      const reply = generateAIReply(text);
+      const noteMatch = matchKeyword(text, KEYWORD_TO_NOTES);
+      const sugMatch = matchKeyword(text, KEYWORD_TO_SUGGESTS);
+      setMessages((prev) => [...prev, {
+        id: Date.now() + 1, role: "ai",
+        text: reply.text, cite: reply.cite,
+        citedNotes: noteMatch ? noteMatch.noteIds : [],
+        suggests: sugMatch ? sugMatch.suggests : (reply.cite ? [] : DEFAULT_SUGGESTS),
+      }]);
+      setIsTyping(false);
+    }, 900);
+  };
+
+  /* Action: 点击搜推心流的 Tag */
+  const handleAskAboutTag = (tagLabel) => {
+    if (!tagLabel) return;
+    setMobilePanelOpen(false);
+    handleSend("聊聊「" + tagLabel + "」吧");
+  };
+
+  /* Action: 查看完整数字分身报告 */
+  const handleViewPersonaReport = () => {
+    setMobilePanelOpen(false);
+    addExp(4);
+    setIsTyping(true);
+    setTimeout(() => {
+      pushAIMessage({
+        text: "📊 充时的数字分身周报 · 2026 W21\n\n关注重心：求职 48% · 学术 35% · 生活 17%\n默契度本周 +24，活跃天数 7/7\n新增 1 个画像标签：「面试黑马」\n\n💡 我的观察：\n你这周在主站平均每天浏览 23 篇笔记，深度阅读 4 篇，比上周多 1 篇——看得出来春招节奏起来了。建议每天再留 30 分钟系统刷题，6 月前能把算法这块的底子打透。\n\n要不要把这份报告导出到收藏夹，方便复盘？",
+        cite: false,
+        suggests: ["导出到收藏夹", "下周再生成一份", "对比一下上周的数据"],
+      });
+      setIsTyping(false);
+    }, 800);
+  };
+
+  /* Action: 从主站收藏夹导入更多笔记 */
+  const handleImportMore = () => {
+    setMobilePanelOpen(false);
+    const remaining = IMPORTABLE_NOTES.length - importCursor;
+    if (remaining <= 0) {
+      pushAIMessage({
+        text: "你的主站收藏夹里已经全部同步过来啦～新收藏的笔记会在 24 小时内自动同步给我。",
+        cite: false,
+        suggests: ["按主题给我做一份导览", "整理一下旧笔记"],
+      });
+      return;
+    }
+    const batch = IMPORTABLE_NOTES.slice(importCursor, importCursor + 2);
+    setNotes((prev) => [...batch, ...prev]);
+    setImportCursor((c) => c + batch.length);
+    addExp(4);
+
+    setIsTyping(true);
+    setTimeout(() => {
+      pushAIMessage({
+        text: "已为你从主站收藏夹同步了 " + batch.length + " 篇新笔记：\n" +
+              batch.map((n) => "• 《" + n.title + "》  @" + n.author).join("\n") +
+              "\n\n要我帮你做个简单的串讲吗？",
+        cite: true,
+        citedNotes: batch.map((n) => n.id),
+        suggests: ["给我做个简单串讲", "按主题分类", "推荐类似的"],
+      });
+      setIsTyping(false);
+    }, 700);
+  };
+
+  const canImportMore = importCursor < IMPORTABLE_NOTES.length;
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  const handleResetMemory = () => {
+    if (!confirm("确定要清空点点的记忆吗？\n所有对话、Tag 和默契度都会重置。")) return;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem("diandian_splash_seen_v4");
+    } catch(e){}
+    setMessages([{
+      id: Date.now(), role: "ai",
+      text: "记忆已重置～充时，我们重新认识一下吧！",
+      cite: false, citedNotes: [], suggests: DEFAULT_SUGGESTS,
+    }]);
+    setTags(INITIAL_FOOTPRINT_TAGS);
+    setNotes(COLLECTED_NOTES);
+    setImportCursor(0);
+    setExp(62); setLevel(3);
+    setMobilePanelOpen(false);
+  };
+
+  return (
+    <div className="min-h-screen light-bg text-xhs-ink">
+      {showSplash && (
+        <div className="splash-overlay">
+          <div className="splash-card">
+            <div className="splash-avatar"><Icon name="chat" className="w-10 h-10 text-white" strokeWidth={2.4} /></div>
+            <div className="splash-title">点点 · 充时的专属分身</div>
+            <div className="splash-sub">正在加载你的小红书足迹与收藏夹…</div>
+            <div className="splash-dots"><span/><span/><span/></div>
+          </div>
+        </div>
+      )}
+
+      <TopNav onReset={handleResetMemory} onTogglePanel={() => setMobilePanelOpen((v) => !v)} mobilePanelOpen={mobilePanelOpen} />
+
+      <main className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 pb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
+          <section className="lg:col-span-7 xl:col-span-7">
+            <div className="chat-shell bg-white rounded-3xl shadow-card overflow-hidden flex flex-col h-[calc(100vh-104px)] min-h-[640px] border border-xhs-line">
+              <ChatHeader exp={exp} level={level} />
+
+              <div className="chat-stream flex-1 overflow-y-auto light-scroll px-4 sm:px-5 lg:px-6 py-5 space-y-5">
+                {messages.map((m, idx) => (
+                  <MessageBubble
+                    key={m.id}
+                    msg={m}
+                    notes={notes}
+                    isLast={idx === messages.length - 1 && !isTyping}
+                    onSuggest={handleSend}
+                  />
+                ))}
+                {isTyping && <TypingBubble />}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="px-4 sm:px-5 lg:px-6 pb-5 pt-3 border-t border-xhs-line">
+                <div className="flex items-center gap-2 bg-xhs-bg rounded-full px-4 py-2.5 border border-transparent focus-within:border-xhs-red/30 focus-within:bg-white focus-within:shadow-glow transition-all">
+                  <button className="shrink-0 w-7 h-7 rounded-full text-xhs-sub hover:text-xhs-red transition-colors flex items-center justify-center" title="语音输入">
+                    <Icon name="mic" className="w-4 h-4" />
+                  </button>
+                  <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="给点点发消息…"
+                    className="flex-1 bg-transparent outline-none text-sm placeholder:text-xhs-mute text-xhs-ink min-w-0"
+                  />
+                  {input.trim() ? (
+                    <button onClick={() => handleSend()}
+                      className="shrink-0 w-9 h-9 rounded-full xhs-grad text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-glow">
+                      <Icon name="send" className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button className="shrink-0 w-7 h-7 rounded-full text-xhs-sub hover:text-xhs-red transition-colors flex items-center justify-center" title="拍照识别">
+                      <Icon name="camera" className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <p className="mt-2 text-[10.5px] text-xhs-mute text-center">
+                  内容由 AI 生成，仅供参考 · 数据仅存于本地浏览器
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <aside className={"lg:col-span-5 xl:col-span-5 space-y-4 lg:max-h-[calc(100vh-104px)] lg:overflow-y-auto light-scroll lg:pr-1 " + (mobilePanelOpen
+              ? "fixed inset-0 z-40 light-bg p-4 pt-20 overflow-y-auto lg:static lg:p-0 lg:pt-0"
+              : "hidden lg:block")}>
+            {mobilePanelOpen && (
+              <div className="lg:hidden flex items-center justify-between mb-3">
+                <h2 className="font-bold text-base">我的小红书生态</h2>
+                <button onClick={() => setMobilePanelOpen(false)} className="w-9 h-9 rounded-full bg-white border border-xhs-line shadow-card flex items-center justify-center text-xhs-ink">
+                  <Icon name="x" className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            <FootprintPanel tags={tags} onTagClick={handleAskAboutTag} />
+            <PersonaPanel tags={PERSONA_TAGS} onViewReport={handleViewPersonaReport} />
+            <CollectionPanel notes={notes} canImportMore={canImportMore} onImport={handleImportMore} />
+          </aside>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ===== 顶部导航 ===== */
+function TopNav({ onReset, onTogglePanel, mobilePanelOpen }) {
+  return (
+    <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-xhs-line">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 h-14 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 shrink-0 rounded-2xl xhs-grad flex items-center justify-center text-white shadow-glow">
+            <Icon name="chat" className="w-4 h-4" strokeWidth={2.4} />
+          </div>
+          <span className="font-semibold text-[16px] tracking-wide text-xhs-ink">点点</span>
+          <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-md bg-xhs-redLight text-xhs-red font-medium border border-xhs-red/15">
+            生态版 · Beta
+          </span>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button onClick={onReset} className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-xhs-bg hover:bg-xhs-redLight hover:text-xhs-red text-xhs-sub text-xs font-medium transition-colors border border-xhs-line" title="清空记忆">
+            <Icon name="rotateCcw" className="w-3 h-3" /><span>清空记忆</span>
+          </button>
+          <button onClick={onTogglePanel} className="lg:hidden inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-xhs-redLight text-xhs-red text-xs font-medium border border-xhs-red/15">
+            <Icon name={mobilePanelOpen ? "x" : "menu"} className="w-3.5 h-3.5" /><span>生态</span>
+          </button>
+          <div className="w-8 h-8 shrink-0 rounded-full xhs-grad flex items-center justify-center shadow-card">
+            <span className="text-white text-xs font-bold">吕</span>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ===== 聊天 Header ===== */
+function ChatHeader({ exp, level }) {
+  return (
+    <div className="px-4 sm:px-5 lg:px-6 pt-4 pb-4 border-b border-xhs-line">
+      <div className="flex items-center gap-3">
+        <div className="relative shrink-0">
+          <div className="w-10 h-10 rounded-2xl xhs-grad flex items-center justify-center text-white shadow-glow">
+            <Icon name="chat" className="w-5 h-5" strokeWidth={2.4} />
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-semibold text-[14.5px] truncate text-xhs-ink">点点 · 充时的专属分身</h1>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-xhs-redLight text-xhs-red font-bold border border-xhs-red/15">Lv.{level}</span>
+          </div>
+          <p className="text-[11.5px] text-xhs-sub mt-0.5">
+            已陪伴你 <b className="text-xhs-ink">128</b> 天 · 学习了你 <b className="text-xhs-ink">347</b> 篇收藏
+          </p>
+        </div>
+        <div className="hidden sm:flex flex-col items-end shrink-0 w-24">
+          <div className="flex items-center justify-between text-[10px] mb-1 w-full">
+            <span className="text-xhs-mute">默契度</span>
+            <span className="text-xhs-red font-semibold">{exp}/100</span>
+          </div>
+          <div className="h-1 w-full bg-xhs-bg rounded-full overflow-hidden">
+            <div className="h-full exp-bar-shine rounded-full transition-all duration-700 ease-out" style={{ width: `${exp}%` }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===== 消息气泡 ===== */
+function MessageBubble({ msg, isLast, onSuggest, notes = [] }) {
+  if (msg.role === "user") {
+    return (
+      <div className="flex justify-end anim-slide-up">
+        <div className="max-w-[78%] xhs-grad text-white rounded-3xl rounded-tr-lg px-4 py-2.5 text-[14px] shadow-card whitespace-pre-wrap leading-relaxed">
+          {msg.text}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex gap-2.5 anim-slide-up">
+      <div className="shrink-0 w-8 h-8 rounded-2xl xhs-grad flex items-center justify-center text-white shadow-glow">
+        <Icon name="chat" className="w-4 h-4" strokeWidth={2.4} />
+      </div>
+      <div className="flex-1 min-w-0 space-y-2.5">
+        <div className="ai-bubble group">
+          <div className="bg-xhs-bg rounded-3xl rounded-tl-lg px-4 py-3 text-[14px] leading-relaxed whitespace-pre-wrap text-xhs-ink border border-xhs-line">
+            {msg.text}
+          </div>
+          <div className="bubble-actions mt-1.5 ml-2 flex items-center gap-3 text-xhs-mute">
+            <button className="hover:text-xhs-red transition-colors" title="分享">
+              <Icon name="share" className="w-3.5 h-3.5" />
+            </button>
+            <button className="hover:text-xhs-red transition-colors" title="更多">
+              <Icon name="more" className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {msg.cite && msg.citedNotes && msg.citedNotes.length > 0 && (
+          <div className="space-y-1.5 anim-fade-in">
+            <div className="flex items-center gap-1.5 text-[11px] text-xhs-sub px-1">
+              <Icon name="bookOpen" className="w-3 h-3" />
+              <span>参考了你收藏夹里的 <b className="text-xhs-red">{msg.citedNotes.length}</b> 篇笔记</span>
+            </div>
+            <div className="grid gap-1.5">
+              {msg.citedNotes.map((id) => {
+                const note = notes.find((n) => n.id === id);
+                if (!note) return null;
+                return (
+                  <button key={id} className="w-full flex items-center gap-2.5 bg-white border border-xhs-line rounded-2xl px-3 py-2 hover:border-xhs-red/40 hover:shadow-card transition-all group text-left">
+                    <div className={"shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br " + note.coverGradient + " flex items-center justify-center text-base"}>
+                      {note.coverEmoji}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12.5px] font-medium truncate text-xhs-ink group-hover:text-xhs-red transition-colors">{note.title}</div>
+                      <div className="text-[10.5px] text-xhs-mute flex items-center gap-1.5 mt-0.5">
+                        <span>@{note.author}</span><span>·</span>
+                        <Icon name="heart" className="w-2.5 h-2.5" />
+                        <span>{note.likes}</span>
+                      </div>
+                    </div>
+                    <Icon name="chevronRight" className="w-4 h-4 text-xhs-mute group-hover:text-xhs-red transition-colors shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {isLast && msg.suggests && msg.suggests.length > 0 && (
+          <div className="pt-1 space-y-1.5 anim-fade-in">
+            {msg.suggests.map((s) => (
+              <button key={s} onClick={() => onSuggest(s)}
+                className="suggest-link group flex items-center gap-1.5 text-[13px] text-xhs-ink/85 hover:text-xhs-red transition-colors">
+                <span>{s}</span>
+                <Icon name="arrowUpRight" className="w-3.5 h-3.5 text-xhs-mute group-hover:text-xhs-red transition-colors" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TypingBubble() {
+  return (
+    <div className="flex gap-2.5 anim-fade-in">
+      <div className="shrink-0 w-8 h-8 rounded-2xl xhs-grad flex items-center justify-center text-white shadow-glow">
+        <Icon name="chat" className="w-4 h-4" strokeWidth={2.4} />
+      </div>
+      <div className="bg-xhs-bg rounded-3xl rounded-tl-lg px-4 py-3 flex items-center border border-xhs-line">
+        <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+      </div>
+    </div>
+  );
+}
+
+/* ===== 主站搜推心流 ===== */
+function FootprintPanel({ tags, onTagClick }) {
+  return (
+    <div className="bg-white rounded-3xl border border-xhs-line shadow-card p-5">
+      <PanelHeader iconName="search" title="主站搜推心流" subtitle="近期足迹 · 来自小红书 App"
+        accent={
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-xhs-redLight text-xhs-red font-semibold flex items-center gap-1 border border-xhs-red/15">
+            <Icon name="flame" className="w-2.5 h-2.5" />实时
+          </span>
+        } />
+      <div className="mt-3.5 flex flex-wrap gap-2">
+        {tags.map((t) => (
+          <button type="button" key={t.id} onClick={() => onTagClick && onTagClick(t.label)}
+            className={"group inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer active:scale-95 " +
+              (t.fresh ? "tag-enter xhs-grad text-white border-xhs-red shadow-glow"
+              : t.hot ? "bg-xhs-redLight text-xhs-red border-xhs-red/15 hover:bg-xhs-red hover:text-white hover:border-xhs-red"
+              : "bg-xhs-bg text-xhs-ink border-xhs-line hover:bg-xhs-redLight hover:text-xhs-red hover:border-xhs-red/30")}>
+            <Icon name="search" className="w-3 h-3" />
+            {t.label}
+            {t.fresh && <span className="ml-0.5 text-[9px] px-1 py-0 rounded bg-white/30">NEW</span>}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 pt-3 border-t border-xhs-line flex items-center gap-2 text-[11px] text-xhs-sub">
+        <Icon name="zap" className="w-3 h-3 text-xhs-red" />
+        <span>点点正在与小红书主站 <b className="text-xhs-red">双向同步</b> 你的搜索意图 · 点击 Tag 让我聊聊它</span>
+      </div>
+    </div>
+  );
+}
+
+/* ===== 数字分身画像 ===== */
+function PersonaPanel({ tags, onViewReport }) {
+  return (
+    <div className="bg-white rounded-3xl border border-xhs-line shadow-card p-5">
+      <PanelHeader iconName="user" title="数字分身画像" subtitle="基于长期行为的特征标签"
+        accent={<span className="text-[10px] text-xhs-mute">{tags.length} 个核心标签</span>} />
+      <div className="mt-3.5 grid grid-cols-2 gap-2">
+        {tags.map((t) => (
+          <div key={t.label}
+            className="flex items-center gap-2 px-3 py-2 rounded-2xl text-xs font-medium bg-xhs-bg hover:bg-xhs-redLight border border-xhs-line hover:border-xhs-red/25 hover:scale-[1.02] transition-all cursor-default text-xhs-ink">
+            <span className="text-base">{t.emoji}</span>
+            <span className="truncate">{t.label}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 pt-3 border-t border-xhs-line flex items-center justify-between text-[11px]">
+        <span className="text-xhs-mute">画像更新于 2 小时前</span>
+        <button onClick={onViewReport} className="text-xhs-red font-semibold hover:underline flex items-center gap-0.5 active:scale-95 transition-transform">
+          查看完整分身报告 <Icon name="chevronRight" className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ===== 专属收藏夹 ===== */
+function CollectionPanel({ notes, onImport, canImportMore = true }) {
+  const left = notes.filter((_, i) => i % 2 === 0);
+  const right = notes.filter((_, i) => i % 2 === 1);
+  return (
+    <div className="bg-white rounded-3xl border border-xhs-line shadow-card p-5">
+      <PanelHeader iconName="bookmark" title="专属收藏夹" subtitle="私域知识库 · 点点的记忆来源"
+        accent={<span className="text-[10px] px-1.5 py-0.5 rounded-md bg-xhs-bg text-xhs-ink font-semibold border border-xhs-line">{notes.length} 篇</span>} />
+      <div className="mt-3.5 grid grid-cols-2 gap-2.5">
+        <div className="space-y-2.5">{left.map((n) => <NoteCard key={n.id} note={n} />)}</div>
+        <div className="space-y-2.5">{right.map((n) => <NoteCard key={n.id} note={n} />)}</div>
+      </div>
+      <button onClick={onImport} disabled={!canImportMore}
+        className="mt-3 w-full py-2 rounded-2xl bg-xhs-bg border border-xhs-line text-xs text-xhs-sub hover:text-xhs-red hover:border-xhs-red/30 hover:bg-xhs-redLight font-medium transition-colors flex items-center justify-center gap-1 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-xhs-sub disabled:hover:bg-xhs-bg disabled:hover:border-xhs-line">
+        <Icon name="plus" className="w-3 h-3" />{canImportMore ? "从主站收藏夹导入更多" : "已全部同步完毕"}
+      </button>
+    </div>
+  );
+}
+
+function NoteCard({ note }) {
+  return (
+    <div className="rounded-2xl overflow-hidden bg-white border border-xhs-line hover:border-xhs-red/30 hover:-translate-y-0.5 hover:shadow-lift transition-all cursor-pointer group">
+      <div className={"bg-gradient-to-br " + note.coverGradient + " relative flex items-center justify-center"} style={{ height: note.height * 0.55 }}>
+        <span className="text-4xl drop-shadow-sm">{note.coverEmoji}</span>
+        <span className="absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded-md bg-white/85 backdrop-blur text-xhs-ink font-semibold">{note.tag}</span>
+      </div>
+      <div className="px-2.5 py-2">
+        <h4 className="text-[12px] font-medium leading-snug line-clamp-2 text-xhs-ink group-hover:text-xhs-red transition-colors">{note.title}</h4>
+        <div className="mt-1.5 flex items-center justify-between text-[10px] text-xhs-mute">
+          <div className="flex items-center gap-1 truncate">
+            <div className="w-3.5 h-3.5 rounded-full xhs-grad-soft border border-xhs-redLight" />
+            <span className="truncate">{note.author}</span>
+          </div>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <Icon name="heart" className="w-2.5 h-2.5" />
+            <span>{note.likes}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PanelHeader({ iconName, title, subtitle, accent }) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-2xl xhs-grad-soft text-xhs-red flex items-center justify-center border border-xhs-red/15">
+          <Icon name={iconName} className="w-4 h-4" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-sm text-xhs-ink">{title}</h3>
+          <p className="text-[11px] text-xhs-mute mt-0.5">{subtitle}</p>
+        </div>
+      </div>
+      {accent}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<Page />);
+</script>
+</body>
+</html>
